@@ -31,12 +31,12 @@ impl<'d> LedRmtDriver<'d> {
         let t0l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(700))?;
         let t1h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(600))?;
         let t1l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(500))?;
-        return Ok((t0h, t0l, t1h, t1l));
+        Ok((t0h, t0l, t1h, t1l))
     }
 
     fn get_rgb_pulses<'a>(
         &'a mut self,
-        rgb: RGB8,
+        rgb: &RGB8,
         pulses: &'a (Pulse, Pulse, Pulse, Pulse),
     ) -> Vec<&Pulse> {
         let color: u32 = ((rgb.g as u32) << 16) | ((rgb.r as u32) << 8) | rgb.b as u32;
@@ -53,18 +53,19 @@ impl<'d> LedRmtDriver<'d> {
                 pulses.push(t0l);
             }
         }
-        return pulses;
+        pulses
     }
 
-    pub fn write(&mut self, rgb: RGB8) -> Result<(), EspError> {
+    #[allow(dead_code)]
+    pub fn write(&mut self, rgb: &RGB8) -> Result<(), EspError> {
         let mut signal = VariableLengthSignal::new();
         let pulses = self.get_data_pulses()?;
         let rgb_pulses = self.get_rgb_pulses(rgb, &pulses);
         signal.push(rgb_pulses)?;
         self.tx.start_blocking(&signal)
     }
-
-    pub fn write_n(&mut self, rgb: RGB8, n: u32) -> Result<(), EspError> {
+    #[allow(dead_code)]
+    pub fn write_n(&mut self, rgb: &RGB8, n: u32) -> Result<(), EspError> {
         let mut signal = VariableLengthSignal::new();
         let pulses = self.get_data_pulses()?;
         for _i in 0..n {
@@ -73,10 +74,10 @@ impl<'d> LedRmtDriver<'d> {
         }
         self.tx.start_blocking(&signal)
     }
-
-    pub fn write_iter<T>(&mut self, rgbs: T) -> Result<(), EspError>
+    #[allow(dead_code)]
+    pub fn write_iter<'c, T>(&mut self, rgbs: T) -> Result<(), EspError>
     where
-        T: Iterator<Item = RGB8>,
+        T: Iterator<Item = &'c RGB8>,
     {
         let mut signal = VariableLengthSignal::new();
         let pulses = self.get_data_pulses()?;
