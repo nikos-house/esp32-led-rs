@@ -1,8 +1,5 @@
 use crate::updatable::Updatable;
-use esp_idf_hal::gpio::{Input, InputPin, PinDriver};
-use esp_idf_sys::EspError;
 use observable_rs::Observable;
-use smart_leds::RGB;
 
 pub struct Cycle<T> {
     current_index: usize,

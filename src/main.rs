@@ -13,7 +13,6 @@ use smart_leds_trait::RGB8;
 use crate::cycle::Cycle;
 use crate::runtime::{Runtime, RuntimeStatus};
 use crate::updatable::{Pollable, Updatable};
-use observable_rs::Observable;
 use std::{cell::RefCell, rc::Rc};
 
 fn main() {
@@ -21,6 +20,7 @@ fn main() {
 
     if let Some(peripherals) = Peripherals::take() {
         let mut runtime = Runtime::new(peripherals.pins.gpio2, peripherals.rmt.channel0);
+        runtime.set_status(RuntimeStatus::Healthy);
 
         let strip_driver = match ws_led_rmt_driver::LedRmtDriver::new(
             peripherals.pins.gpio0,

@@ -1,5 +1,3 @@
-use crate::updatable::{Pollable, Updatable};
-use crate::ws_led_rmt_driver;
 use crate::ws_led_rmt_driver::LedRmtDriver;
 use esp_idf_hal::gpio::OutputPin;
 use esp_idf_hal::peripheral::Peripheral;
@@ -20,7 +18,7 @@ impl<'d> Runtime<'d> {
         status_pin: impl Peripheral<P = impl OutputPin> + 'd,
         status_channel: impl Peripheral<P = impl RmtChannel> + 'd,
     ) -> Self {
-        let mut status_driver = match LedRmtDriver::new(status_pin, status_channel) {
+        let status_driver = match LedRmtDriver::new(status_pin, status_channel) {
             Ok(driver) => driver,
             Err(_err) => panic!("could initialize status led"),
         };
