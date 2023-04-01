@@ -20,8 +20,9 @@ esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
 esp-idf-hal = { version = "0.40.1", esp32c3 = true }
 smart-leds = "0.3.0"
 smart-leds-trait = "0.2.1"
-observable-rs = "0.2.0"
 num = "0.4.0"
+rgb = "0.8.36"
+bno055 = "0.3.3"
 
 [build-dependencies]
 embuild = "0.30.4"

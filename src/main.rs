@@ -1,27 +1,28 @@
 mod animation;
 mod color;
 mod cycle;
+mod gyro;
 mod layer;
 mod numbers;
 mod runtime;
 mod switch;
 mod time_animation;
-mod updatable;
 mod ws_led_rmt_driver;
 
 use esp_idf_sys as _; // using `binstart` feature of `esp-idf-sys`
 
-use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::peripherals::Peripherals;
-use smart_leds_trait::RGB8;
 
 use crate::animation::{Animatable, ShiftAnimation};
 use crate::cycle::Cycle;
+use crate::gyro::Gyro;
 use crate::runtime::{Runtime, RuntimeStatus};
-use crate::time_animation::{ease_in, ease_in_out, linear, TimeAnimationRunner};
-use crate::updatable::{Pollable, Updatable};
+use crate::time_animation::{linear, TimeAnimationRunner};
+use esp_idf_hal::delay::FreeRtos;
+use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
+use esp_idf_hal::units::FromValueType;
+use rgb::RGB8;
 use std::time::Duration;
-use std::{cell::RefCell, rc::Rc};
 
 fn main() {
     esp_idf_sys::link_patches();
@@ -38,83 +39,113 @@ fn main() {
             Err(_err) => panic!("could initialize led strip"),
         };
 
-        let switch = match switch::Switch::new(peripherals.pins.gpio4) {
+        let mut switch = match switch::Switch::new(peripherals.pins.gpio9) {
             Ok(switch) => switch,
             Err(_err) => panic!("could initialize switch"),
         };
 
-        // let colors = Cycle::new(vec![
-        //     RGBLayer::interpolate_colors(
-        //         vec![
-        //             RGB8::new(10, 0, 0),
-        //             RGB8::new(0, 0, 10),
-        //             RGB8::new(0, 10, 0),
-        //         ],
-        //         30,
-        //     ),
-        //     RGBLayer::interpolate_colors(
-        //         vec![RGB8::new(0, 0, 0), RGB8::new(0, 0, 10), RGB8::new(0, 0, 0)],
-        //         30,
-        //     ),
-        //     RGBLayer::interpolate_colors(vec![RGB8::new(0, 10, 0), RGB8::new(0, 0, 10)], 30),
-        //     RGBLayer::interpolate_colors(
-        //         vec![
-        //             RGB8::new(1, 0, 0),
-        //             RGB8::new(20, 0, 10),
-        //             RGB8::new(30, 20, 0),
-        //             RGB8::new(0, 20, 30),
-        //             RGB8::new(0, 0, 1),
-        //         ],
-        //         30,
-        //     ),
-        //     RGBLayer::interpolate_colors(vec![RGB8::new(10, 0, 0), RGB8::new(0, 0, 10)], 30),
-        //     RGBLayer::interpolate_colors(
-        //         vec![
-        //             RGB8::new(10, 0, 0),
-        //             RGB8::new(0, 0, 10),
-        //             RGB8::new(0, 10, 0),
-        //             RGB8::new(10, 0, 0),
-        //         ],
-        //         30,
-        //     ),
-        // ]);
-        //
-        // let durable_strip_driver = rc!(strip_driver);
-        // let durable_runtime = rc!(runtime);
-        // colors.subscribe_to_updates(Box::new(move |layer| {
-        //     let mut strip_driver_ptr = durable_strip_driver.borrow_mut();
-        //     let mut runtime_ptr = durable_runtime.borrow_mut();
-        //     if let Err(_err) = strip_driver_ptr.write_iter(layer.iter()) {
-        //         runtime_ptr.set_status(RuntimeStatus::Error);
-        //     }
-        // }));
-        //
-        // let durable_colors = rc!(colors);
-        // switch.subscribe_to_updates(Box::new(move |value| {
-        //     if *value {
-        //         let mut colors_ptr = durable_colors.borrow_mut();
-        //         colors_ptr.next();
-        //     }
-        // }));
+        let strip_length = 30;
 
-        let mut loop_colors = layer::stretch(
-            vec![
-                RGB8::new(40, 0, 0),
-                RGB8::new(0, 0, 40),
-                RGB8::new(0, 40, 0),
-                RGB8::new(40, 0, 0),
-            ],
-            30,
-        );
-        let mut linear_looping_runner =
-            TimeAnimationRunner::new(Duration::from_millis(2000), true, linear);
-        let mut linear_looping_rainbow = ShiftAnimation::new(linear_looping_runner, loop_colors);
+        let mut animations = Cycle::new(vec![
+            ShiftAnimation::new(
+                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
+                layer::stretch(
+                    vec![
+                        RGB8::new(130, 0, 60),
+                        RGB8::new(30, 0, 130),
+                        RGB8::new(130, 0, 0),
+                        RGB8::new(130, 0, 60),
+                    ],
+                    strip_length,
+                ),
+            ),
+            ShiftAnimation::new(
+                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
+                layer::stretch(
+                    vec![
+                        RGB8::new(130, 0, 0),
+                        RGB8::new(0, 0, 130),
+                        RGB8::new(0, 130, 0),
+                        RGB8::new(130, 0, 0),
+                    ],
+                    strip_length,
+                ),
+            ),
+            ShiftAnimation::new(
+                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
+                layer::stretch(
+                    vec![
+                        RGB8::new(130, 0, 0),
+                        RGB8::new(0, 0, 130),
+                        RGB8::new(130, 0, 0),
+                    ],
+                    strip_length,
+                ),
+            ),
+            ShiftAnimation::new(
+                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
+                layer::stretch(
+                    vec![
+                        RGB8::new(0, 100, 0),
+                        RGB8::new(100, 0, 50),
+                        RGB8::new(0, 100, 0),
+                    ],
+                    strip_length,
+                ),
+            ),
+            ShiftAnimation::new(
+                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
+                layer::stretch(
+                    vec![
+                        RGB8::new(100, 0, 0),
+                        RGB8::new(0, 20, 0),
+                        RGB8::new(100, 0, 0),
+                    ],
+                    strip_length,
+                ),
+            ),
+        ]);
 
-        loop {
-            // switch.poll();
-            if let Err(_err) = strip_driver.write_iter(linear_looping_rainbow.get_layer().iter()) {
+        let config = I2cConfig::new().baudrate(100.kHz().into());
+        let i2c = I2cDriver::new(
+            peripherals.i2c0,
+            peripherals.pins.gpio5,
+            peripherals.pins.gpio6,
+            &config,
+        )
+        .unwrap();
+
+        match Gyro::new(i2c) {
+            Ok(mut gyro) => loop {
+                switch.poll_value();
+
+                if let Some(value) = switch.get_value_changed(true) {
+                    if value {
+                        animations.next();
+                    }
+                }
+                if let Err(_err) =
+                    strip_driver.write_iter(animations.get_current().get_layer().iter())
+                {
+                    runtime.set_status(RuntimeStatus::Error);
+                }
+
+                switch.commit_value();
+                match gyro.get_angle() {
+                    Ok(angle) => {
+                        println!("angle: {:?}", angle);
+                    }
+                    Err(_err) => {
+                        runtime.set_status(RuntimeStatus::Error);
+                    }
+                }
+            },
+            Err(_err) => {
                 runtime.set_status(RuntimeStatus::Error);
+                loop {
+                    FreeRtos::delay_ms(1000);
+                }
             }
-        }
+        };
     }
 }

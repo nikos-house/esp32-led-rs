@@ -14,6 +14,7 @@ pub struct Runtime<'d> {
 }
 
 impl<'d> Runtime<'d> {
+    #[allow(dead_code)]
     pub fn new(
         status_pin: impl Peripheral<P = impl OutputPin> + 'd,
         status_channel: impl Peripheral<P = impl RmtChannel> + 'd,
@@ -26,6 +27,7 @@ impl<'d> Runtime<'d> {
         Self { status_driver }
     }
 
+    #[allow(dead_code)]
     pub fn set_status(&mut self, status: RuntimeStatus) {
         match status {
             RuntimeStatus::Healthy => {

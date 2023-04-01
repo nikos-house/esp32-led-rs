@@ -1,18 +1,22 @@
 use crate::animation::AnimationRunner;
 use std::time::Duration;
 
+#[allow(dead_code)]
 pub fn linear(t: f32) -> f32 {
     t
 }
 
+#[allow(dead_code)]
 pub fn ease_in(t: f32) -> f32 {
     t * t
 }
 
+#[allow(dead_code)]
 pub fn ease_out(t: f32) -> f32 {
     1.0 - ease_in(1.0 - t)
 }
 
+#[allow(dead_code)]
 pub fn ease_in_out(t: f32) -> f32 {
     if t < 0.5 {
         ease_in(t * 2.0) / 2.0
@@ -21,7 +25,8 @@ pub fn ease_in_out(t: f32) -> f32 {
     }
 }
 
-pub(crate) struct TimeAnimationRunner {
+#[derive(Clone)]
+pub struct TimeAnimationRunner {
     duration: Duration,
     looping: bool,
     loop_start_time: std::time::Instant,
@@ -29,6 +34,7 @@ pub(crate) struct TimeAnimationRunner {
 }
 
 impl TimeAnimationRunner {
+    #[allow(dead_code)]
     pub fn new(duration: Duration, looping: bool, timing_fn: fn(f32) -> f32) -> Self {
         Self {
             duration,
@@ -40,6 +46,7 @@ impl TimeAnimationRunner {
 }
 
 impl AnimationRunner for TimeAnimationRunner {
+    #[allow(dead_code)]
     fn get_progress(&mut self) -> f32 {
         let elapsed = std::time::Instant::now() - self.loop_start_time;
         if elapsed >= self.duration {

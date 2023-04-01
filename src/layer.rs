@@ -1,17 +1,14 @@
-use crate::color::lerp_rgb;
-use num::integer::lcm;
-use num::{Integer, Signed};
-use smart_leds::RGB8;
-use std::cmp::min;
+use crate::color::LerpableColor;
 
-pub fn stretch(layer: Vec<RGB8>, length: usize) -> Vec<RGB8> {
+#[allow(dead_code)]
+pub fn stretch<T: LerpableColor + Clone>(layer: Vec<T>, length: usize) -> Vec<T> {
     let n_layer = layer.len();
     if n_layer == 0 || length == 0 {
         return Vec::new();
     }
 
     if n_layer == 1 {
-        return vec![layer[0]; length];
+        return vec![layer[0].clone(); length];
     }
 
     if n_layer == length {
@@ -28,16 +25,17 @@ pub fn stretch(layer: Vec<RGB8>, length: usize) -> Vec<RGB8> {
 
         let weight = idx.fract();
 
-        let low_color = layer[low_idx];
-        let high_color = layer[high_idx];
+        let low_color = &layer[low_idx];
+        let high_color = &layer[high_idx];
 
-        result.push(lerp_rgb(low_color, high_color, weight));
+        result.push(low_color.lerp(high_color.clone(), weight));
     }
 
     result
 }
 
-pub fn shift(layer: Vec<RGB8>, offset: f64) -> Vec<RGB8> {
+#[allow(dead_code)]
+pub fn shift<T: LerpableColor + Clone>(layer: Vec<T>, offset: f64) -> Vec<T> {
     let length = layer.len();
     if length == 0 {
         return Vec::new();
@@ -48,7 +46,7 @@ pub fn shift(layer: Vec<RGB8>, offset: f64) -> Vec<RGB8> {
     }
 
     let interpolation_factor = 10;
-    let interpolated_layer = stretch(layer.clone(), length * interpolation_factor);
+    let interpolated_layer = stretch(layer, length * interpolation_factor);
 
     let interpolated_offset = (offset * interpolation_factor as f64).round() as usize;
     let mut result = Vec::with_capacity(length);
@@ -56,7 +54,7 @@ pub fn shift(layer: Vec<RGB8>, offset: f64) -> Vec<RGB8> {
     for i in 0..length {
         let idx =
             (i * interpolation_factor + interpolated_offset) % (length * interpolation_factor);
-        result.push(interpolated_layer[idx]);
+        result.push(interpolated_layer[idx].clone());
     }
 
     result

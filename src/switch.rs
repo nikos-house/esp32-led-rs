@@ -1,38 +1,42 @@
-use crate::updatable::{Pollable, Updatable};
 use esp_idf_hal::gpio::{Input, InputPin, PinDriver};
 use esp_idf_sys::EspError;
-use observable_rs::Observable;
 
 pub struct Switch<'d, T: InputPin> {
     driver: PinDriver<'d, T, Input>,
-    value_observable: Observable<bool>,
+    current_value: bool,
+    last_value: bool,
 }
 
 impl<'d, T: InputPin> Switch<'d, T> {
-    #[inline]
+    #[allow(dead_code)]
     pub fn new(pin: T) -> Result<Self, EspError> {
         let driver = PinDriver::input(pin)?;
 
         let value = driver.is_low();
-        let value_observable = Observable::new(value);
 
         Ok(Self {
             driver,
-            value_observable,
+            last_value: value,
+            current_value: value,
         })
     }
-}
 
-impl<'d, T: InputPin> Updatable<bool> for Switch<'d, T> {
-    fn subscribe_to_updates(&self, cb: Box<dyn Fn(&bool)>) {
-        self.value_observable.subscribe(cb);
+    #[allow(dead_code)]
+    pub fn poll_value(&mut self) {
+        self.current_value = self.driver.is_low();
     }
-}
-impl<'d, T: InputPin> Pollable<bool> for Switch<'d, T> {
-    fn poll(&self) {
-        let value = self.driver.is_low();
-        if *self.value_observable.get() != value {
-            self.value_observable.set(value);
+
+    #[allow(dead_code)]
+    pub fn get_value_changed(&self, new_value: bool) -> Option<bool> {
+        if self.current_value != self.last_value && self.current_value == new_value {
+            Some(self.current_value)
+        } else {
+            None
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn commit_value(&mut self) {
+        self.last_value = self.current_value;
     }
 }

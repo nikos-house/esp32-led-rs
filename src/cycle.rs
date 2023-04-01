@@ -1,33 +1,25 @@
-use crate::updatable::Updatable;
-use observable_rs::Observable;
-
 pub struct Cycle<T> {
     current_index: usize,
     options: Vec<T>,
-    current_observable: Observable<T>,
 }
 
 impl<T: Clone> Cycle<T> {
+    #[allow(dead_code)]
     pub fn new(options: Vec<T>) -> Self {
         let current_index = 0;
-        let current_observable = Observable::new(options[current_index].clone());
         Self {
             current_index,
             options,
-            current_observable,
         }
     }
 
+    #[allow(dead_code)]
     pub fn next(&mut self) {
         self.current_index = (self.current_index + 1) % self.options.len();
-        self.current_observable
-            .set(self.options[self.current_index].clone());
     }
-}
 
-impl<T> Updatable<T> for Cycle<T> {
-    fn subscribe_to_updates(&self, cb: Box<dyn Fn(&T)>) {
-        cb(&self.current_observable.get());
-        self.current_observable.subscribe(cb);
+    #[allow(dead_code)]
+    pub fn get_current(&self) -> T {
+        self.options[self.current_index].clone()
     }
 }
