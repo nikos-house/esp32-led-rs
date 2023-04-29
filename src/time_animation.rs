@@ -25,7 +25,6 @@ pub fn ease_in_out(t: f32) -> f32 {
     }
 }
 
-#[derive(Clone)]
 pub struct TimeAnimationRunner {
     duration: Duration,
     looping: bool,

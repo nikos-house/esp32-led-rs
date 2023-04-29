@@ -3,7 +3,7 @@ pub struct Cycle<T> {
     options: Vec<T>,
 }
 
-impl<T: Clone> Cycle<T> {
+impl<T> Cycle<T> {
     #[allow(dead_code)]
     pub fn new(options: Vec<T>) -> Self {
         let current_index = 0;
@@ -19,7 +19,7 @@ impl<T: Clone> Cycle<T> {
     }
 
     #[allow(dead_code)]
-    pub fn get_current(&self) -> T {
-        self.options[self.current_index].clone()
+    pub fn get_current(&self) -> &T {
+        &self.options[self.current_index]
     }
 }

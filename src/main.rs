@@ -2,6 +2,7 @@ mod animation;
 mod color;
 mod cycle;
 mod gyro;
+mod gyro_animation;
 mod layer;
 mod numbers;
 mod runtime;
@@ -9,13 +10,16 @@ mod switch;
 mod time_animation;
 mod ws_led_rmt_driver;
 
-use esp_idf_sys as _; // using `binstart` feature of `esp-idf-sys`
+use esp_idf_sys as _;
+use std::ops::Deref; // using `binstart` feature of `esp-idf-sys`
 
 use esp_idf_hal::peripherals::Peripherals;
 
-use crate::animation::{Animatable, ShiftAnimation};
+use crate::animation::{Animatable, AnimationRunner, ShiftAnimation};
 use crate::cycle::Cycle;
 use crate::gyro::Gyro;
+use crate::gyro_animation::GyroAnimationRunner;
+use crate::layer::shift;
 use crate::runtime::{Runtime, RuntimeStatus};
 use crate::time_animation::{linear, TimeAnimationRunner};
 use esp_idf_hal::delay::FreeRtos;
@@ -44,107 +48,81 @@ fn main() {
             Err(_err) => panic!("could initialize switch"),
         };
 
-        let strip_length = 30;
-
-        let mut animations = Cycle::new(vec![
-            ShiftAnimation::new(
-                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
-                layer::stretch(
-                    vec![
-                        RGB8::new(130, 0, 60),
-                        RGB8::new(30, 0, 130),
-                        RGB8::new(130, 0, 0),
-                        RGB8::new(130, 0, 60),
-                    ],
-                    strip_length,
-                ),
-            ),
-            ShiftAnimation::new(
-                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
-                layer::stretch(
-                    vec![
-                        RGB8::new(130, 0, 0),
-                        RGB8::new(0, 0, 130),
-                        RGB8::new(0, 130, 0),
-                        RGB8::new(130, 0, 0),
-                    ],
-                    strip_length,
-                ),
-            ),
-            ShiftAnimation::new(
-                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
-                layer::stretch(
-                    vec![
-                        RGB8::new(130, 0, 0),
-                        RGB8::new(0, 0, 130),
-                        RGB8::new(130, 0, 0),
-                    ],
-                    strip_length,
-                ),
-            ),
-            ShiftAnimation::new(
-                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
-                layer::stretch(
-                    vec![
-                        RGB8::new(0, 100, 0),
-                        RGB8::new(100, 0, 50),
-                        RGB8::new(0, 100, 0),
-                    ],
-                    strip_length,
-                ),
-            ),
-            ShiftAnimation::new(
-                TimeAnimationRunner::new(Duration::from_secs(5), true, linear),
-                layer::stretch(
-                    vec![
-                        RGB8::new(100, 0, 0),
-                        RGB8::new(0, 20, 0),
-                        RGB8::new(100, 0, 0),
-                    ],
-                    strip_length,
-                ),
-            ),
-        ]);
-
         let config = I2cConfig::new().baudrate(100.kHz().into());
-        let i2c = I2cDriver::new(
+        match I2cDriver::new(
             peripherals.i2c0,
             peripherals.pins.gpio5,
             peripherals.pins.gpio6,
             &config,
-        )
-        .unwrap();
+        ) {
+            Ok(i2c) => {
+                match Gyro::new(i2c) {
+                    Ok(gyro) => {
+                        let strip_length = 160;
 
-        match Gyro::new(i2c) {
-            Ok(mut gyro) => loop {
-                switch.poll_value();
+                        let mut animation_runner = GyroAnimationRunner::new(gyro);
+                        let rainbow_animation = ShiftAnimation::new(layer::stretch(
+                            vec![
+                                RGB8::new(10, 0, 0),
+                                RGB8::new(5, 0, 10),
+                                RGB8::new(10, 0, 0),
+                            ],
+                            strip_length,
+                        ));
 
-                if let Some(value) = switch.get_value_changed(true) {
-                    if value {
-                        animations.next();
-                    }
-                }
-                if let Err(_err) =
-                    strip_driver.write_iter(animations.get_current().get_layer().iter())
-                {
-                    runtime.set_status(RuntimeStatus::Error);
-                }
+                        let red_pointer = ShiftAnimation::new(layer::stretch(
+                            vec![
+                                RGB8::new(10, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(0, 0, 0),
+                                RGB8::new(10, 0, 0),
+                            ],
+                            strip_length,
+                        ));
 
-                switch.commit_value();
-                match gyro.get_angle() {
-                    Ok(angle) => {
-                        println!("angle: {:?}", angle);
+                        let mut animations = Cycle::new(vec![rainbow_animation, red_pointer]);
+
+                        loop {
+                            switch.poll_value();
+
+                            if let Some(value) = switch.get_value_changed(true) {
+                                if value {
+                                    animations.next();
+                                }
+                            }
+                            match animation_runner.get_progress() {
+                                Ok(progress) => {
+                                    let new_layer = animations.get_current().get_layer(progress);
+                                    if let Err(_err) = strip_driver.write_iter(new_layer.iter()) {
+                                        runtime.set_status(RuntimeStatus::Error);
+                                    }
+                                }
+                                Err(_err) => {
+                                    runtime.set_status(RuntimeStatus::Error);
+                                }
+                            }
+
+                            switch.commit_value();
+                        }
                     }
                     Err(_err) => {
                         runtime.set_status(RuntimeStatus::Error);
+                        loop {
+                            FreeRtos::delay_ms(1000);
+                        }
                     }
-                }
-            },
+                };
+            }
             Err(_err) => {
                 runtime.set_status(RuntimeStatus::Error);
-                loop {
-                    FreeRtos::delay_ms(1000);
-                }
             }
         };
     }
