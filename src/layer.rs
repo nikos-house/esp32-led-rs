@@ -1,4 +1,5 @@
 use crate::color::LerpableColor;
+use std::time::Instant;
 
 #[allow(dead_code)]
 pub fn stretch<T: LerpableColor + Clone>(layer: Vec<T>, length: usize) -> Vec<T> {
@@ -28,7 +29,7 @@ pub fn stretch<T: LerpableColor + Clone>(layer: Vec<T>, length: usize) -> Vec<T>
         let low_color = &layer[low_idx];
         let high_color = &layer[high_idx];
 
-        result.push(low_color.lerp(high_color.clone(), weight));
+        result.push(low_color.lerp(high_color, weight));
     }
 
     result
@@ -45,7 +46,7 @@ pub fn shift<T: LerpableColor + Clone>(layer: Vec<T>, offset: f64) -> Vec<T> {
         return layer;
     }
 
-    let interpolation_factor = 10;
+    let interpolation_factor = 1;
     let interpolated_layer = stretch(layer, length * interpolation_factor);
 
     let interpolated_offset = (offset * interpolation_factor as f64).round() as usize;

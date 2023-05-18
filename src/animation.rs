@@ -1,5 +1,6 @@
 use crate::color::LerpableColor;
 use crate::layer;
+use std::time::Instant;
 
 pub trait AnimationRunner {
     fn get_progress(&mut self) -> f32;

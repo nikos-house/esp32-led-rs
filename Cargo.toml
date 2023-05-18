@@ -16,13 +16,14 @@ opt-level = "z"
 pio = ["esp-idf-sys/pio"]
 
 [dependencies]
-esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
-esp-idf-hal = { version = "0.40.1", esp32c3 = true }
+esp-idf-sys = { version = "0.33.0", features = ["binstart"] }
+esp-idf-hal = { version = "0.41.0", esp32c3 = true }
+esp-idf-svc = { version = "0.46.0" }
 smart-leds = "0.3.0"
-smart-leds-trait = "0.2.1"
 num = "0.4.0"
 rgb = "0.8.36"
 bno055 = "0.3.3"
+ws2812-esp32-rmt-driver = "0.5.0"
 
 [build-dependencies]
 embuild = "0.30.4"

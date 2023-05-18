@@ -8,7 +8,6 @@ mod numbers;
 mod runtime;
 mod switch;
 mod time_animation;
-mod ws_led_rmt_driver;
 
 use esp_idf_sys as _;
 use std::ops::Deref; // using `binstart` feature of `esp-idf-sys`
@@ -25,20 +24,20 @@ use crate::time_animation::{linear, TimeAnimationRunner};
 use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_hal::units::FromValueType;
-use rgb::RGB8;
-use std::time::Duration;
+use esp_idf_svc::nvs::{EspNvs, EspNvsPartition, NvsCustom, NvsDefault};
+use smart_leds::{SmartLedsWrite, White};
+use std::time::{Duration, Instant};
+use ws2812_esp32_rmt_driver::driver::color::LedPixelColorGrbw32;
+use ws2812_esp32_rmt_driver::{LedPixelEsp32Rmt, RGBW8};
 
 fn main() {
     esp_idf_sys::link_patches();
 
     if let Some(peripherals) = Peripherals::take() {
-        let mut runtime = Runtime::new(peripherals.pins.gpio2, peripherals.rmt.channel0);
+        let mut runtime = Runtime::new(2, 0);
         runtime.set_status(RuntimeStatus::Healthy);
 
-        let mut strip_driver = match ws_led_rmt_driver::LedRmtDriver::new(
-            peripherals.pins.gpio0,
-            peripherals.rmt.channel1,
-        ) {
+        let mut strip_driver = match LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(1, 0) {
             Ok(driver) => driver,
             Err(_err) => panic!("could initialize led strip"),
         };
@@ -48,82 +47,110 @@ fn main() {
             Err(_err) => panic!("could initialize switch"),
         };
 
-        let config = I2cConfig::new().baudrate(100.kHz().into());
-        match I2cDriver::new(
-            peripherals.i2c0,
-            peripherals.pins.gpio5,
-            peripherals.pins.gpio6,
-            &config,
-        ) {
-            Ok(i2c) => {
-                match Gyro::new(i2c) {
-                    Ok(gyro) => {
-                        let strip_length = 160;
+        let strip_length = 144;
 
-                        let mut animation_runner = GyroAnimationRunner::new(gyro);
-                        let rainbow_animation = ShiftAnimation::new(layer::stretch(
-                            vec![
-                                RGB8::new(10, 0, 0),
-                                RGB8::new(5, 0, 10),
-                                RGB8::new(10, 0, 0),
-                            ],
-                            strip_length,
-                        ));
+        let mut animation_runner =
+            TimeAnimationRunner::new(Duration::from_millis(1000), true, linear);
+        let rainbow_animation = ShiftAnimation::new(layer::stretch(
+            vec![
+                RGBW8::from((40, 0, 0, White(0))),
+                RGBW8::from((30, 0, 20, White(0))),
+                RGBW8::from((40, 0, 0, White(0))),
+            ],
+            strip_length,
+        ));
+        let tracer_animation = ShiftAnimation::new(layer::stretch(
+            vec![
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((20, 0, 0, White(0))),
+                RGBW8::from((10, 0, 5, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+            ],
+            strip_length,
+        ));
+        let double_tracer_animation = ShiftAnimation::new(layer::stretch(
+            vec![
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((20, 0, 0, White(0))),
+                RGBW8::from((10, 0, 5, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((20, 0, 0, White(0))),
+                RGBW8::from((10, 0, 5, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+            ],
+            strip_length,
+        ));
+        let white_animation = ShiftAnimation::new(layer::stretch(
+            vec![
+                RGBW8::from((0, 0, 0, White(15))),
+                RGBW8::from((0, 0, 0, White(15))),
+            ],
+            strip_length,
+        ));
+        let off_animation = ShiftAnimation::new(layer::stretch(
+            vec![
+                RGBW8::from((0, 0, 0, White(0))),
+                RGBW8::from((0, 0, 0, White(0))),
+            ],
+            strip_length,
+        ));
 
-                        let red_pointer = ShiftAnimation::new(layer::stretch(
-                            vec![
-                                RGB8::new(10, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(0, 0, 0),
-                                RGB8::new(10, 0, 0),
-                            ],
-                            strip_length,
-                        ));
+        let partition = match EspNvsPartition::<NvsDefault>::take() {
+            Ok(partition) => partition,
+            Err(_err) => panic!("could not take nvs partition"),
+        };
+        let nvs = match EspNvs::new(partition, &"cycle", true) {
+            Ok(nvs) => nvs,
+            Err(_err) => panic!("could not initialize nvs"),
+        };
 
-                        let mut animations = Cycle::new(vec![rainbow_animation, red_pointer]);
+        let mut animations = Cycle::new(
+            &nvs,
+            vec![
+                rainbow_animation,
+                tracer_animation,
+                double_tracer_animation,
+                white_animation,
+                off_animation,
+            ],
+            &"animation",
+        );
 
-                        loop {
-                            switch.poll_value();
+        loop {
+            switch.poll_value();
 
-                            if let Some(value) = switch.get_value_changed(true) {
-                                if value {
-                                    animations.next();
-                                }
-                            }
-                            match animation_runner.get_progress() {
-                                Ok(progress) => {
-                                    let new_layer = animations.get_current().get_layer(progress);
-                                    if let Err(_err) = strip_driver.write_iter(new_layer.iter()) {
-                                        runtime.set_status(RuntimeStatus::Error);
-                                    }
-                                }
-                                Err(_err) => {
-                                    runtime.set_status(RuntimeStatus::Error);
-                                }
-                            }
-
-                            switch.commit_value();
-                        }
-                    }
-                    Err(_err) => {
-                        runtime.set_status(RuntimeStatus::Error);
-                        loop {
-                            FreeRtos::delay_ms(1000);
-                        }
-                    }
-                };
+            if let Some(_) = switch.get_value_changed(true) {
+                animations.next();
             }
-            Err(_err) => {
+            let progress = animation_runner.get_progress();
+
+            let animation = animations.get_current();
+            let new_layer = animation.get_layer(progress);
+
+            if let Err(_err) = strip_driver.write(new_layer.into_iter()) {
                 runtime.set_status(RuntimeStatus::Error);
             }
-        };
+
+            switch.commit_value();
+        }
     }
 }
