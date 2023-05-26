@@ -22,6 +22,7 @@ use crate::layer::shift;
 use crate::runtime::{Runtime, RuntimeStatus};
 use crate::time_animation::{linear, TimeAnimationRunner};
 use esp_idf_hal::delay::FreeRtos;
+use esp_idf_hal::gpio::Pin;
 use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_hal::units::FromValueType;
 use esp_idf_svc::nvs::{EspNvs, EspNvsPartition, NvsCustom, NvsDefault};
@@ -34,20 +35,23 @@ fn main() {
     esp_idf_sys::link_patches();
 
     if let Some(peripherals) = Peripherals::take() {
-        let mut runtime = Runtime::new(2, 0);
+        let mut runtime = Runtime::new(peripherals.pins.gpio2.pin() as u32, 0);
         runtime.set_status(RuntimeStatus::Healthy);
 
-        let mut strip_driver = match LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(1, 0) {
+        let mut strip_driver = match LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(
+            1,
+            peripherals.pins.gpio5.pin() as u32,
+        ) {
             Ok(driver) => driver,
             Err(_err) => panic!("could initialize led strip"),
         };
 
-        let mut switch = match switch::Switch::new(peripherals.pins.gpio9) {
+        let mut switch = match switch::Switch::new(peripherals.pins.gpio20) {
             Ok(switch) => switch,
             Err(_err) => panic!("could initialize switch"),
         };
 
-        let strip_length = 144;
+        let strip_length = 450;
 
         let mut animation_runner =
             TimeAnimationRunner::new(Duration::from_millis(1000), true, linear);
