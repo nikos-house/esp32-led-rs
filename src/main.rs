@@ -26,9 +26,9 @@ use esp_idf_hal::gpio::Pin;
 use esp_idf_hal::i2c::{I2cConfig, I2cDriver};
 use esp_idf_hal::units::FromValueType;
 use esp_idf_svc::nvs::{EspNvs, EspNvsPartition, NvsCustom, NvsDefault};
-use smart_leds::{SmartLedsWrite, White};
+use smart_leds::{SmartLedsWrite, White, RGB8};
 use std::time::{Duration, Instant};
-use ws2812_esp32_rmt_driver::driver::color::LedPixelColorGrbw32;
+use ws2812_esp32_rmt_driver::driver::color::{LedPixelColorGrb24, LedPixelColorGrbw32};
 use ws2812_esp32_rmt_driver::{LedPixelEsp32Rmt, RGBW8};
 
 fn main() {
@@ -38,7 +38,7 @@ fn main() {
         let mut runtime = Runtime::new(peripherals.pins.gpio2.pin() as u32, 0);
         runtime.set_status(RuntimeStatus::Healthy);
 
-        let mut strip_driver = match LedPixelEsp32Rmt::<RGBW8, LedPixelColorGrbw32>::new(
+        let mut strip_driver = match LedPixelEsp32Rmt::<RGB8, LedPixelColorGrb24>::new(
             1,
             peripherals.pins.gpio5.pin() as u32,
         ) {
@@ -57,63 +57,9 @@ fn main() {
             TimeAnimationRunner::new(Duration::from_millis(1000), true, linear);
         let rainbow_animation = ShiftAnimation::new(layer::stretch(
             vec![
-                RGBW8::from((40, 0, 0, White(0))),
-                RGBW8::from((30, 0, 20, White(0))),
-                RGBW8::from((40, 0, 0, White(0))),
-            ],
-            strip_length,
-        ));
-        let tracer_animation = ShiftAnimation::new(layer::stretch(
-            vec![
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((20, 0, 0, White(0))),
-                RGBW8::from((10, 0, 5, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-            ],
-            strip_length,
-        ));
-        let double_tracer_animation = ShiftAnimation::new(layer::stretch(
-            vec![
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((20, 0, 0, White(0))),
-                RGBW8::from((10, 0, 5, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((20, 0, 0, White(0))),
-                RGBW8::from((10, 0, 5, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
-            ],
-            strip_length,
-        ));
-        let white_animation = ShiftAnimation::new(layer::stretch(
-            vec![
-                RGBW8::from((0, 0, 0, White(15))),
-                RGBW8::from((0, 0, 0, White(15))),
-            ],
-            strip_length,
-        ));
-        let off_animation = ShiftAnimation::new(layer::stretch(
-            vec![
-                RGBW8::from((0, 0, 0, White(0))),
-                RGBW8::from((0, 0, 0, White(0))),
+                RGB8::new(20, 20, 20),
+                RGB8::new(20, 20, 20),
+                RGB8::new(20, 20, 20),
             ],
             strip_length,
         ));
@@ -122,22 +68,12 @@ fn main() {
             Ok(partition) => partition,
             Err(_err) => panic!("could not take nvs partition"),
         };
-        let nvs = match EspNvs::new(partition, &"cycle", true) {
+        let nvs = match EspNvs::new(partition, &"cycle2", true) {
             Ok(nvs) => nvs,
             Err(_err) => panic!("could not initialize nvs"),
         };
 
-        let mut animations = Cycle::new(
-            &nvs,
-            vec![
-                rainbow_animation,
-                tracer_animation,
-                double_tracer_animation,
-                white_animation,
-                off_animation,
-            ],
-            &"animation",
-        );
+        let mut animations = Cycle::new(&nvs, vec![rainbow_animation], &"animation");
 
         loop {
             switch.poll_value();
